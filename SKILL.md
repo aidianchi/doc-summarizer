@@ -85,7 +85,7 @@ description: |
 > [!quote]
 > 可原样摘出一句原文关键句；quote 只是强调，不替代正文。
 
-^quote01
+^para02
 ```
 
 不要在整理版原文中使用 `[!abstract]` 或 `[!important]` 来替代正文。`abstract/important/example/tip` 主要用于深度总结。
@@ -102,7 +102,7 @@ description: |
 - 从 `^para01` 顺序编号
 - `^` 前必须有空格
 - 锚点应落在有上下文的正文段落，不锚定标题或空行
-- 如果必须锚定 quote/callout，块 ID 单独放在 quote/callout 后一行
+- 所有块锚点统一使用 `^paraXX`；如果必须锚定 quote/callout，块 ID 单独放在 quote/callout 后一行，并接入同一 `^paraXX` 序列
 
 在原文末尾添加反向链接：
 
