@@ -14,7 +14,8 @@
         "深度总结含 source 和 [[原文标题#^paraXX]] 块链接",
         "概念卡有来源链接，已存在概念卡执行整合或追加来源",
         "同标签笔记达到阈值时更新 MOC，新建 MOC 时更新 index",
-        "3知识/log.md 记录来源、输出、归档、概念卡、MOC 和关键发现"
+        "3知识/log.md 记录来源、输出、归档、概念卡、MOC 和关键发现",
+        "对本次输出文件运行 scripts/lint-vault-output 且通过"
       ]
     },
     {
@@ -28,7 +29,8 @@
         "quote 只用于强调，不替代正文",
         "整理版原文包含 ^paraXX 块锚点",
         "深度总结关键判断能回链到整理版原文",
-        "完成后追加 3知识/log.md"
+        "完成后追加 3知识/log.md",
+        "对本次输出文件运行 scripts/lint-vault-output 且通过"
       ]
     },
     {
@@ -54,7 +56,8 @@
         "深度总结保留研究问题、方法、结果、讨论和局限",
         "研究发现和方法论均能回链到原文块锚点",
         "概念卡和 MOC 处理符合 vault 规则",
-        "log 记录本次 ingest"
+        "log 记录本次 ingest",
+        "对本次输出文件运行 scripts/lint-vault-output 且通过"
       ]
     },
     {
@@ -76,7 +79,8 @@
         "先判断输入是否是完整原文",
         "完整原文进入 ingest 流程",
         "摘要版输入停止处理并提示风险",
-        "成功 ingest 时维护块锚点、概念卡、MOC、index 和 log"
+        "成功 ingest 时维护块锚点、概念卡、MOC、index 和 log",
+        "成功 ingest 时对本次输出文件运行 scripts/lint-vault-output"
       ]
     }
   ]

@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'USAGE'
+Usage: lint-vault-output <vault-root> <file> [file...]
+
+Checks doc-summarizer output files for vault contract violations:
+- stale template placeholders
+- bare block links such as [[#^para01]]
+- missing YAML/tags/source fields
+- missing archive anchors/backlinks
+- missing concept-card source links
+USAGE
+}
+
+if [[ $# -lt 2 ]]; then
+  usage
+  exit 2
+fi
+
+VAULT_ROOT="${1%/}"
+shift
+
+errors=0
+
+report() {
+  local file="$1"
+  local message="$2"
+  printf '%s: %s\n' "$file" "$message" >&2
+  errors=$((errors + 1))
+}
+
+has_frontmatter() {
+  local file="$1"
+  [[ "$(sed -n '1p' "$file")" == "---" ]] && sed -n '2,80p' "$file" | grep -q '^---$'
+}
+
+frontmatter_has() {
+  local file="$1"
+  local key="$2"
+  awk -v key="$key" '
+    NR == 1 && $0 != "---" { exit 1 }
+    NR > 1 && $0 == "---" { exit found ? 0 : 1 }
+    NR > 1 && $0 ~ ("^" key ":[[:space:]]*") { found = 1 }
+  ' "$file"
+}
+
+normalized_concept_name() {
+  local path="$1"
+  local base
+  base="$(basename "$path" .md)"
+  printf '%s\n' "$base" | sed 's/^概念-//'
+}
+
+check_duplicate_concept_name() {
+  local file="$1"
+  local current_norm
+  local other
+  local other_norm
+  current_norm="$(normalized_concept_name "$file")"
+
+  while IFS= read -r other; do
+    [[ "$other" == "$file" ]] && continue
+    other_norm="$(normalized_concept_name "$other")"
+    if [[ "$other_norm" == "$current_norm" ]]; then
+      report "$file" "duplicate concept name after normalization: $(basename "$other")"
+      return
+    fi
+  done < <(find "$VAULT_ROOT/3知识/概念卡" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort)
+}
+
+for file in "$@"; do
+  case "$file" in
+    /*) ;;
+    *) file="$VAULT_ROOT/$file" ;;
+  esac
+
+  if [[ ! -f "$file" ]]; then
+    report "$file" "file does not exist"
+    continue
+  fi
+
+  case "$file" in
+    *.md) ;;
+    *) continue ;;
+  esac
+
+  if rg -n '\[\[(来源|原文)(#|\]\])|\{原文\}|\{原文标题\}|\{总结文件\}|\[\[实际原文标题|\[\[实际总结文件名' "$file" >/dev/null; then
+    report "$file" "placeholder remains in wikilink or template text"
+  fi
+
+  if rg -n '\[\[#\^para[0-9]+' "$file" >/dev/null; then
+    report "$file" "bare block link found; use [[实际原文标题#^paraXX]]"
+  fi
+
+  if ! has_frontmatter "$file"; then
+    report "$file" "missing YAML frontmatter"
+  else
+    if ! frontmatter_has "$file" "tags"; then
+      report "$file" "missing tags in YAML frontmatter"
+    fi
+  fi
+
+  rel="${file#$VAULT_ROOT/}"
+
+  case "$rel" in
+    3知识/概念卡/*.md)
+      if ! rg -n '源自：\[\[[^]]+\]\]' "$file" >/dev/null; then
+        report "$file" "missing concept source link"
+      fi
+      check_duplicate_concept_name "$file"
+      ;;
+    3知识/*深度总结*.md)
+      if ! frontmatter_has "$file" "source"; then
+        report "$file" "missing source in deep-summary YAML"
+      fi
+      if ! rg -n '\[\[[^]#|]+#\^para[0-9]+' "$file" >/dev/null; then
+        report "$file" "missing source block links in deep summary"
+      fi
+      ;;
+    4归档箱/*.md)
+      if ! rg -n '\^para[0-9]+' "$file" >/dev/null; then
+        report "$file" "missing archive block anchors"
+      fi
+      if ! rg -n '本文的深度总结：\[\[[^]]+\]\]' "$file" >/dev/null; then
+        report "$file" "missing archive backlink to deep summary"
+      fi
+      ;;
+  esac
+done
+
+if [[ "$errors" -gt 0 ]]; then
+  printf 'lint-vault-output found %d issue(s)\n' "$errors" >&2
+  exit 1
+fi
+
+echo "lint-vault-output passed"

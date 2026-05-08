@@ -21,7 +21,7 @@ description: |
 
 本 Skill 负责将单篇原始材料转化为整理版原文、深度总结和必要的知识网络维护：`4归档箱/` 保留可追溯原文，`3知识/` 生成深度总结，并按需维护 `概念卡/MOC/index/log`。
 
-如需详细模板，读取 `references/TEMPLATES.md`。
+如需详细模板，读取 `references/TEMPLATES.md`。完成产出后，用 `scripts/lint-vault-output` 做静态检查。
 
 ## Vault 规则
 
@@ -47,6 +47,30 @@ description: |
 
 ## 工作流
 
+### 执行策略：先预检，再生成，最后自动校验
+
+为了提速且不降低质量，执行时分三层：
+
+1. **Preflight 预检**：先确认输入是否完整原文、目标文件名、同名产物、已有概念卡、相关 MOC 和工具可用性
+2. **Ingest 生成**：只在预检通过后整理原文、生成总结、处理概念卡/MOC/log
+3. **Postflight 校验**：完成后运行 `scripts/lint-vault-output <vault-root> <输出文件...>`；失败就先修正，再报告完成
+
+工具路由：
+- 优先用 `rg` 做本地文件扫描；它稳定、快速、无需 Obsidian 运行
+- 如果 `command -v obsidian` 成功且 `obsidian help` 可用，可用 Obsidian CLI 查询 backlinks、tags、search、append
+- 如果 Obsidian CLI 不可用，不阻塞流程，回退到 `rg`/文件读写
+- `obsidian-markdown` 不必每次完整读取；默认遵守下方最小 Obsidian 契约，遇到复杂 properties、embeds、callouts、公式或渲染问题时再读取完整 skill
+
+最小 Obsidian 契约：
+- 新建 Markdown 必须有 YAML，且包含 `tags`
+- vault 内部链接用 `[[wikilink]]`，外部 URL 用 Markdown 链接
+- 块链接必须写成 `[[实际原文标题#^paraXX]]`，不得写 `[[#^paraXX]]`
+- 段落锚点写在完整段落末尾：`正文。 ^para01`
+- quote/callout 的块锚点单独成行，并接入同一 `^paraXX` 序列
+- `4归档箱/` 原文可用 `[!quote]` 强调，但不能用 callout 替代正文
+- `3知识/` 深度总结可使用 `[!abstract]`、`[!example]`、`[!warning]`、`[!tip]`
+- 概念卡底部必须保留来源回链：`*源自：[[总结文件]]*`
+
 ### Step 0: 输入判定
 
 先判断输入是否是完整材料。
@@ -55,6 +79,13 @@ description: |
 - 如果文件看起来只是摘要、提纲、核心观点列表或旧深度总结，停止并说明：缺少可追溯原文，继续处理会造成二次总结
 - 如果原文来自 URL，先用 `defuddle` 提取正文；如果来自视频，通常应先由 `video-copy-analyzer` 生成文字稿
 - 旧总结、MOC、概念卡只能作为链接参考，不能作为深度总结的主要输入
+
+预检时建立内部清单：
+- 输入路径与原文标题
+- 目标整理版原文、深度总结、可能概念卡、可能 MOC
+- vault 中是否已有同名总结或同名概念卡
+- 同核心标签笔记数是否可能触发 MOC
+- Obsidian CLI 是否可用；不可用则回退本地扫描
 
 ### Step 1: 原文整理与归档
 
@@ -246,6 +277,18 @@ MOC 应包含：
 
 ### Step 7: 完成报告
 
+报告前先运行静态检查：
+
+```bash
+/Users/aidianchi/.claude/skills/doc-summarizer/scripts/lint-vault-output \
+  /Users/aidianchi/Desktop/刘甲知识库 \
+  4归档箱/{原文标题}.md \
+  3知识/{主题}深度总结.md \
+  3知识/概念卡/{概念}.md
+```
+
+只传入本次新增或更新的 Markdown 文件。若检查失败，先修正再输出完成报告。
+
 任务完成后输出：
 
 ```markdown
@@ -308,5 +351,5 @@ MOC 应包含：
 
 - **video-copy-analyzer**：视频先提取文字稿
 - **defuddle**：URL 先提取正文
-- **obsidian-markdown**：确保 YAML、wikilink、callout、块锚点语法正确
-- **obsidian-cli**：如需程序化扫描 vault，可选使用
+- **obsidian-markdown**：默认遵守最小 Obsidian 契约；复杂语法再读取完整 skill
+- **obsidian-cli**：可用时优先做 vault 查询和追加；不可用时回退 `rg`
